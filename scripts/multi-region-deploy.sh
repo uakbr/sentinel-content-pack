@@ -13,8 +13,6 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-REGIONS_FILE="deployment/regions.json"
-
 deploy_to_region() {
     local region=$1
     local resource_group=$2

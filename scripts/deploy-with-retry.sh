@@ -115,7 +115,7 @@ retry_command() {
 check_azure_status() {
     log_info "Checking Azure service health..."
     
-    local status=$(curl -s "https://status.azure.com/api/v2/status.json" 2>/dev/null || echo '{"status":"unknown"}')
+    local status=$(curl -s --connect-timeout 10 --max-time 15 "https://status.azure.com/api/v2/status.json" 2>/dev/null || echo '{"status":"unknown"}')
     local health=$(echo "$status" | jq -r '.status // "unknown"')
     
     if [ "$health" = "healthy" ] || [ "$health" = "unknown" ]; then
@@ -297,7 +297,6 @@ shift 2
 
 PARAMETERS_FILE="deployment/parameters.json"
 LOCATION="eastus"
-RESUME=false
 RESET_STATE=false
 
 while [[ $# -gt 0 ]]; do
@@ -324,10 +323,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --continue-on-error)
             CONTINUE_ON_ERROR=true
-            shift
-            ;;
-        --resume)
-            RESUME=true
             shift
             ;;
         --reset-state)

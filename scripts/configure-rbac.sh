@@ -48,10 +48,9 @@ for LOGIC_APP in $LOGIC_APPS; do
             --output none
         
         # Wait for identity to be ready (poll instead of fixed sleep)
-        local timeout=30
-        local elapsed=0
+        timeout=30
+        elapsed=0
         while [ "$elapsed" -lt "$timeout" ]; do
-            local identity_status
             identity_status=$(az resource show \
                 --resource-group "$RESOURCE_GROUP" \
                 --name "$LOGIC_APP" \
