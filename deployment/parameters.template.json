@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspaceName": {
+      "value": "YOUR_SENTINEL_WORKSPACE_NAME"
+    },
+    "workspaceResourceGroup": {
+      "value": "YOUR_SENTINEL_RESOURCE_GROUP"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "logicAppNamePrefix": {
+      "value": "sentinel-playbook"
+    },
+    "teamsChannelId": {
+      "value": "YOUR_TEAMS_CHANNEL_ID"
+    },
+    "teamsWebhookUrl": {
+      "value": "YOUR_TEAMS_WEBHOOK_URL"
+    },
+    "decisionEngineUrl": {
+      "value": "https://your-decision-engine.azurewebsites.net/api/evaluate"
+    },
+    "approvalEmail": {
+      "value": "security-team@yourcompany.com"
+    },
+    "enableAutoRemediation": {
+      "value": false
+    },
+    "tags": {
+      "value": {
+        "Environment": "Production",
+        "Owner": "Security Operations",
+        "Project": "Sentinel Automation"
+      }
+    }
+  }
+}
+

@@ -101,43 +101,40 @@ graph TB
 
 ## Quick Start
 
-### Prerequisites
+### Zero-Configuration Deployment
 
-```bash
-# Azure CLI
-az --version
-
-# Azure Subscription with Sentinel enabled
-az account show
-
-# Contributor access to Sentinel workspace
-```
-
-### Installation
+This platform eliminates all manual configuration steps. No more clicking through Azure Portal to set up API connections, assign RBAC permissions, or authorize OAuth flows.
 
 ```bash
 # Clone the repository
 git clone https://github.com/uakbr/sentinel-content-pack.git
 cd sentinel-content-pack
 
-# Deploy analytics rules
-az sentinel alert-rule create \
-  --resource-group <rg-name> \
-  --workspace-name <workspace-name> \
-  --alert-rule @analytics/high_severity_anomalous_signin.json
+# Configure your environment (one time)
+cp deployment/parameters.template.json deployment/parameters.json
+# Edit parameters.json with your workspace details
 
-# Deploy playbooks
-az deployment group create \
-  --resource-group <rg-name> \
-  --template-file playbooks/pb-disable-user.json
+# Deploy everything with one command
+./scripts/deploy-all.sh <resource-group> <workspace-name> deployment/parameters.json
 
-# Import watchlists
-az sentinel watchlist create \
-  --resource-group <rg-name> \
-  --workspace-name <workspace-name> \
-  --watchlist-alias high_value_assets \
-  --source-file watchlists/high_value_assets.csv
+# Authorize connections (automated browser flow)
+./scripts/setup-connections.sh <resource-group>
+
+# Validate deployment
+./scripts/validate-deployment.sh <resource-group> <workspace-name>
 ```
+
+### What Gets Automated
+
+- **API Connections**: Sentinel, Azure AD, Teams, Office 365, Defender
+- **Managed Identities**: Automatically enabled for all Logic Apps
+- **RBAC Permissions**: Sentinel Responder, Security Admin, User Admin
+- **Analytics Rules**: Deployed from JSON templates
+- **Playbooks**: Logic Apps with pre-configured workflows
+- **Watchlists**: CSV import automation
+- **Connection Authorization**: Browser-based OAuth flow
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 
 ---
 

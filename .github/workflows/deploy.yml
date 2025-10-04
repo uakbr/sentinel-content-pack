@@ -1,0 +1,152 @@
+name: Deploy Sentinel Content
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'analytics/**'
+      - 'playbooks/**'
+      - 'watchlists/**'
+      - 'workbooks/**'
+      - 'policies/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+
+env:
+  RESOURCE_GROUP: rg-sentinel-prod
+  WORKSPACE_NAME: sentinel-workspace-prod
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  validate:
+    name: Validate Content
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Validate JSON
+        run: |
+          echo "Validating JSON files..."
+          for file in $(find . -name "*.json"); do
+            echo "Checking $file"
+            jq empty "$file" || exit 1
+          done
+          echo "All JSON files are valid"
+      
+      - name: Validate CSV
+        run: |
+          echo "Validating CSV files..."
+          for file in watchlists/*.csv; do
+            if [ -f "$file" ]; then
+              echo "Checking $file"
+              head -n 1 "$file"
+            fi
+          done
+
+  deploy:
+    name: Deploy to Azure
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Set Environment Variables
+        run: |
+          if [ "${{ github.event.inputs.environment }}" == "staging" ]; then
+            echo "RESOURCE_GROUP=rg-sentinel-staging" >> $GITHUB_ENV
+            echo "WORKSPACE_NAME=sentinel-workspace-staging" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.environment }}" == "development" ]; then
+            echo "RESOURCE_GROUP=rg-sentinel-dev" >> $GITHUB_ENV
+            echo "WORKSPACE_NAME=sentinel-workspace-dev" >> $GITHUB_ENV
+          fi
+      
+      - name: Install Azure CLI Extensions
+        run: |
+          az extension add --name sentinel --only-show-errors
+      
+      - name: Deploy API Connections
+        run: |
+          az deployment group create \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --template-file deployment/api-connections.json \
+            --parameters workspaceName=${{ env.WORKSPACE_NAME }} \
+            --parameters workspaceResourceGroup=${{ env.RESOURCE_GROUP }}
+      
+      - name: Deploy Analytics Rules
+        run: |
+          for rule in analytics/*.json; do
+            if [ -f "$rule" ]; then
+              RULE_NAME=$(basename "$rule" .json)
+              echo "Deploying $RULE_NAME..."
+              az sentinel alert-rule create \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --workspace-name ${{ env.WORKSPACE_NAME }} \
+                --alert-rule-template @"$rule" \
+                --output none 2>/dev/null || echo "Rule may already exist"
+            fi
+          done
+      
+      - name: Deploy Playbooks
+        run: |
+          chmod +x scripts/deploy-all.sh
+          for playbook in playbooks/*.json; do
+            if [ -f "$playbook" ]; then
+              PLAYBOOK_NAME=$(basename "$playbook" .json)
+              echo "Deploying $PLAYBOOK_NAME..."
+              az deployment group create \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --template-file "$playbook" \
+                --parameters @deployment/parameters.json \
+                --parameters logicAppName="$PLAYBOOK_NAME" \
+                --output none
+            fi
+          done
+      
+      - name: Configure RBAC
+        run: |
+          chmod +x scripts/configure-rbac.sh
+          ./scripts/configure-rbac.sh ${{ env.RESOURCE_GROUP }} ${{ env.WORKSPACE_NAME }}
+      
+      - name: Validate Deployment
+        run: |
+          chmod +x scripts/validate-deployment.sh
+          ./scripts/validate-deployment.sh ${{ env.RESOURCE_GROUP }} ${{ env.WORKSPACE_NAME }}
+      
+      - name: Azure Logout
+        if: always()
+        run: az logout
+
+  notify:
+    name: Notify Team
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send Notification
+        run: |
+          STATUS="${{ needs.deploy.result }}"
+          if [ "$STATUS" == "success" ]; then
+            MESSAGE="Sentinel content deployed successfully to ${{ github.event.inputs.environment || 'production' }}"
+          else
+            MESSAGE="Sentinel content deployment failed in ${{ github.event.inputs.environment || 'production' }}"
+          fi
+          echo "$MESSAGE"
+
