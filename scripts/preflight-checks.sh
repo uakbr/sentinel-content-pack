@@ -337,7 +337,7 @@ check_parameters_file() {
     local missing_params=()
     for param in "${required_params[@]}"; do
         local value=$(jq -r "$param" "$params_file" 2>/dev/null || echo "null")
-        if [ "$value" = "null" ] || [ "$value" = "YOUR_"* ]; then
+        if [ "$value" = "null" ] || [[ "$value" = "YOUR_"* ]]; then
             missing_params+=("$param")
         fi
     done

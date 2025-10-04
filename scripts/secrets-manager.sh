@@ -90,7 +90,7 @@ grant_access() {
     az keyvault set-policy \
         --name "$keyvault_name" \
         --object-id "$principal_id" \
-        --secret-permissions $permissions \
+        --secret-permissions "$permissions" \
         --output none
     
     log_success "Access granted"

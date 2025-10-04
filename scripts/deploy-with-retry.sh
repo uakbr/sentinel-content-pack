@@ -297,7 +297,6 @@ shift 2
 
 PARAMETERS_FILE="deployment/parameters.json"
 LOCATION="eastus"
-RESUME=false
 RESET_STATE=false
 
 while [[ $# -gt 0 ]]; do
@@ -324,10 +323,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --continue-on-error)
             CONTINUE_ON_ERROR=true
-            shift
-            ;;
-        --resume)
-            RESUME=true
             shift
             ;;
         --reset-state)
