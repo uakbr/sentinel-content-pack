@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": { "type": "string" },
+    "location": { "type": "string" },
+    "decisionEngineUrl": { "type": "string" },
+    "approvalChannel": { "type": "string" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {},
+          "triggers": {
+            "SentinelIncident": {
+              "type": "Request",
+              "kind": "Http",
+              "inputs": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "actions": {
+            "EvaluatePolicy": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "[parameters('decisionEngineUrl')]",
+                "body": "@triggerBody()"
+              }
+            },
+            "RequestApproval": {
+              "runAfter": {
+                "EvaluatePolicy": ["Succeeded"]
+              },
+              "type": "ApiConnection",
+              "inputs": {
+                "body": {
+                  "recipient": "[parameters('approvalChannel')]",
+                  "message": "Disable user @{triggerBody()?.entities[0]?.value}?"
+                },
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['teams']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/approval"
+              }
+            },
+            "DisableUser": {
+              "runAfter": {
+                "RequestApproval": ["Succeeded"]
+              },
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['graph']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/user/disable",
+                "body": {
+                  "userPrincipalName": "@triggerBody()?.entities[0]?.value"
+                }
+              }
+            }
+          },
+          "outputs": {}
+        }
+      }
+    }
+  ]
+}

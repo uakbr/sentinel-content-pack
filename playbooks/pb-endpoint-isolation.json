@@ -1,0 +1,87 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "type": "string"
+    },
+    "location": {
+      "type": "string"
+    },
+    "decisionEngineUrl": {
+      "type": "string"
+    },
+    "teamsWebhookUrl": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Logic/workflows",
+      "apiVersion": "2019-05-01",
+      "name": "[parameters('logicAppName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "state": "Enabled",
+        "definition": {
+          "$schema": "https://schema.management.azure.com/schemas/2016-06-01/workflowdefinition.json#",
+          "contentVersion": "1.0.0.0",
+          "parameters": {},
+          "triggers": {
+            "When_a_response_to_a_Sentinel_alert_is_triggered": {
+              "type": "Request",
+              "kind": "Http",
+              "inputs": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "actions": {
+            "Evaluate_Decision": {
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "[parameters('decisionEngineUrl')]",
+                "body": "@triggerBody()"
+              }
+            },
+            "Isolate_Device": {
+              "runAfter": {
+                "Evaluate_Decision": ["Succeeded"]
+              },
+              "type": "ApiConnection",
+              "inputs": {
+                "body": {
+                  "DeviceId": "@triggerBody()?.entities[0]?.value"
+                },
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/isolateDevice"
+              }
+            },
+            "Notify_Teams": {
+              "runAfter": {
+                "Isolate_Device": ["Succeeded"]
+              },
+              "type": "Http",
+              "inputs": {
+                "method": "POST",
+                "uri": "[parameters('teamsWebhookUrl')]",
+                "body": {
+                  "text": "Device isolated for incident @{triggerBody()?['incidentId']}"
+                }
+              }
+            }
+          },
+          "outputs": {}
+        }
+      }
+    }
+  ]
+}

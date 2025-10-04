@@ -1,0 +1,14 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "SecurityAlert | summarize count() by Severity",
+        "size": 1,
+        "title": "Alerts by severity"
+      }
+    }
+  ]
+}

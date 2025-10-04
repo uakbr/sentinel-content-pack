@@ -1,0 +1,43 @@
+{
+  "version": "2025-10-03",
+  "defaultAction": {
+    "playbook": "pb-default-notify",
+    "approvalsRequired": false,
+    "notifyChannels": [
+      "teams://security-operations"
+    ]
+  },
+  "rules": [
+    {
+      "name": "HighSeverityEndpointIsolation",
+      "priority": 10,
+      "conditions": [
+        { "field": "severity", "operator": "equals", "value": "High" },
+        { "field": "incidentType", "operator": "equals", "value": "DefenderForEndpoint" }
+      ],
+      "action": {
+        "playbook": "pb-endpoint-isolation",
+        "approvalsRequired": true,
+        "notifyChannels": [
+          "teams://soc-critical",
+          "servicenow://incident"
+        ]
+      }
+    },
+    {
+      "name": "UserCompromiseDisable",
+      "priority": 20,
+      "conditions": [
+        { "field": "severity", "operator": "in", "value": ["High", "Medium"] },
+        { "field": "incidentType", "operator": "equals", "value": "IdentityProtection" }
+      ],
+      "action": {
+        "playbook": "pb-disable-user",
+        "approvalsRequired": true,
+        "notifyChannels": [
+          "teams://identity-response"
+        ]
+      }
+    }
+  ]
+}

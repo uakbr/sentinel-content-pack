@@ -1,0 +1,19 @@
+{
+  "version": "test",
+  "generated_at": "2025-10-04T06:08:07.344851Z",
+  "artifacts": {
+    "analytics": [
+      "high_severity_anomalous_signin.json"
+    ],
+    "playbooks": [
+      "pb-disable-user.json",
+      "pb-endpoint-isolation.json"
+    ],
+    "workbooks": [
+      "sentinel_overview.json"
+    ],
+    "watchlists": [
+      "high_value_assets.csv"
+    ]
+  }
+}

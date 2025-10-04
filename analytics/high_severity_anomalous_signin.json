@@ -1,0 +1,22 @@
+{
+  "name": "Anomalous Sign-In High Severity",
+  "kind": "Scheduled",
+  "properties": {
+    "displayName": "Anomalous Sign-In High Severity",
+    "description": "Detects high-risk sign-ins with unfamiliar locations.",
+    "severity": "High",
+    "enabled": true,
+    "query": "SigninLogs | where RiskLevel == 'high'",
+    "queryFrequency": "PT5M",
+    "queryPeriod": "PT5M",
+    "triggerOperator": "GreaterThan",
+    "triggerThreshold": 0,
+    "suppressionDuration": "PT1H",
+    "suppressionEnabled": false,
+    "tactics": ["InitialAccess"],
+    "techniques": ["T1078"],
+    "eventGroupingSettings": {
+      "aggregationKind": "AlertPerResult"
+    }
+  }
+}
