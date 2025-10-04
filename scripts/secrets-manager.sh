@@ -169,9 +169,9 @@ scan_for_secrets() {
         "https://hooks\\.slack\\.com/services/[A-Z0-9/]+"
         "https://.*\\.webhook\\.office\\.com/webhookb2/[a-f0-9-]+@[a-f0-9-]+/IncomingWebhook/[a-f0-9]+/[a-f0-9-]+"
         "Bearer [A-Za-z0-9_\\.\\-]{40,}"
-        "ghp_[A-Za-z0-9]{36}"
-        "ghs_[A-Za-z0-9]{36}"
-        "gho_[A-Za-z0-9]{36}"
+        "ghp_[A-Za-z0-9]{40}"
+        "ghs_[A-Za-z0-9]{40}"
+        "gho_[A-Za-z0-9]{40}"
         "AIza[0-9A-Za-z_\\-]{35}"
         "AKIA[0-9A-Z]{16}"
     )
@@ -201,7 +201,8 @@ encrypt_file() {
         echo ""
     fi
     
-    openssl enc -aes-256-cbc -salt -in "$input_file" -out "$output_file" -k "$password"
+    # Use PBKDF2 for key derivation instead of deprecated -k
+    openssl enc -aes-256-cbc -pbkdf2 -iter 100000 -salt -in "$input_file" -out "$output_file" -pass "pass:$password"
     log_success "File encrypted: $output_file"
 }
 
@@ -215,7 +216,8 @@ decrypt_file() {
         echo ""
     fi
     
-    openssl enc -d -aes-256-cbc -in "$input_file" -out "$output_file" -k "$password"
+    # Use PBKDF2 for key derivation instead of deprecated -k
+    openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -in "$input_file" -out "$output_file" -pass "pass:$password"
     log_success "File decrypted: $output_file"
 }
 
