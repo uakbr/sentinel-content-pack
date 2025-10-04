@@ -1,0 +1,37 @@
+# Deployment state and backups
+.deployment-state.json
+.deployment-backups/
+.migrations/
+.migration-backups/
+.version
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+*-output.log
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Parameters with secrets
+deployment/parameters.json
+
+# Test reports
+test-report.html
+health-report.html
+cost-report.csv
+
+# Encrypted files
+*.enc

@@ -85,187 +85,36 @@ upgrade_logic_app() {
     log_success "  Upgrade complete"
 }
 
-migrate_v1_to_v2() {
-    local resource_group=$1
-    local workspace_name=$2
-    
-    log_info "Migrating from v1 to v2..."
-    
-    create_migration_backup "$resource_group"
-    
-    log_info "Step 1: Updating Logic App runtime versions..."
-    local logic_apps=$(az resource list \
-        --resource-group "$resource_group" \
-        --resource-type "Microsoft.Logic/workflows" \
-        --query "[].name" -o tsv)
-    
-    while IFS= read -r app; do
-        if [ -n "$app" ]; then
-            log_info "  Updating: $app"
-            # Add specific v1 to v2 migration logic here
-        fi
-    done <<< "$logic_apps"
-    
-    log_info "Step 2: Updating API connections..."
-    # Add connection migration logic
-    
-    log_info "Step 3: Updating analytics rules..."
-    # Add rules migration logic
-    
-    echo "2.0.0" > .version
-    log_success "Migration to v2 complete"
-}
-
-check_breaking_changes() {
-    local from_version=$1
-    local to_version=$2
-    
-    log_info "Checking for breaking changes: $from_version -> $to_version"
-    
-    if [ "$from_version" = "1.0.0" ] && [ "$to_version" = "2.0.0" ]; then
-        log_warning "Breaking changes detected:"
-        echo "  - Logic App connection references changed"
-        echo "  - Parameter schema updated"
-        echo "  - New RBAC roles required"
-        return 1
-    fi
-    
-    log_success "No breaking changes detected"
-    return 0
-}
-
-apply_migration() {
-    local migration_file=$1
-    local resource_group=$2
-    
-    log_info "Applying migration: $migration_file"
-    
-    if [ ! -f "$migration_file" ]; then
-        log_error "Migration file not found"
-        return 1
-    fi
-    
-    local migration_type=$(jq -r '.type' "$migration_file")
-    local steps=$(jq -r '.steps[]' "$migration_file")
-    
-    log_info "Migration type: $migration_type"
-    
-    while IFS= read -r step; do
-        log_info "  Executing: $step"
-        # Execute migration step
-    done <<< "$steps"
-    
-    log_success "Migration applied"
-}
-
-rollback_migration() {
-    local backup_dir=$1
-    local resource_group=$2
-    
-    log_warning "Rolling back migration from: $backup_dir"
-    
-    if [ ! -d "$backup_dir" ]; then
-        log_error "Backup directory not found"
-        return 1
-    fi
-    
-    log_info "Restoring Logic Apps..."
-    for backup_file in "$backup_dir"/logic-apps/*.json; do
-        if [ -f "$backup_file" ]; then
-            local app_name=$(basename "$backup_file" .json)
-            log_info "  Restoring: $app_name"
-            # Restore logic app from backup
-        fi
-    done
-    
-    log_success "Rollback complete"
-}
-
 export_configuration() {
     local resource_group=$1
     local output_dir=${2:-"./export"}
     
-    log_info "Exporting configuration to: $output_dir"
-    
-    mkdir -p "$output_dir"/{logic-apps,connections,rules,watchlists}
-    
-    log_info "Exporting Logic Apps..."
-    local logic_apps=$(az resource list \
-        --resource-group "$resource_group" \
-        --resource-type "Microsoft.Logic/workflows" \
-        --query "[].name" -o tsv)
-    
-    while IFS= read -r app; do
-        if [ -n "$app" ]; then
-            az resource show \
-                --resource-group "$resource_group" \
-                --name "$app" \
-                --resource-type "Microsoft.Logic/workflows" \
-                > "$output_dir/logic-apps/${app}.json"
-        fi
-    done <<< "$logic_apps"
-    
-    log_info "Exporting API Connections..."
-    local connections=$(az resource list \
-        --resource-group "$resource_group" \
-        --resource-type "Microsoft.Web/connections" \
-        --query "[].name" -o tsv)
-    
-    while IFS= read -r conn; do
-        if [ -n "$conn" ]; then
-            az resource show \
-                --resource-group "$resource_group" \
-                --name "$conn" \
-                --resource-type "Microsoft.Web/connections" \
-                > "$output_dir/connections/${conn}.json"
-        fi
-    done <<< "$connections"
-    
-    log_success "Export complete"
+    log_warning "Export functionality is not yet implemented"
+    log_info "Planned: Export Logic Apps and connections to: $output_dir"
+    return 1
 }
 
 import_configuration() {
     local source_dir=$1
     local resource_group=$2
     
-    log_info "Importing configuration from: $source_dir"
-    
-    if [ ! -d "$source_dir" ]; then
-        log_error "Source directory not found"
-        return 1
-    fi
-    
-    if [ -d "$source_dir/connections" ]; then
-        log_info "Importing connections..."
-        for file in "$source_dir"/connections/*.json; do
-            if [ -f "$file" ]; then
-                log_info "  Importing: $(basename "$file")"
-                # Import connection
-            fi
-        done
-    fi
-    
-    if [ -d "$source_dir/logic-apps" ]; then
-        log_info "Importing Logic Apps..."
-        for file in "$source_dir"/logic-apps/*.json; do
-            if [ -f "$file" ]; then
-                log_info "  Importing: $(basename "$file")"
-                # Import logic app
-            fi
-        done
-    fi
-    
-    log_success "Import complete"
+    log_warning "Import functionality is not yet implemented"
+    log_info "Planned: Import configuration from: $source_dir to $resource_group"
+    return 1
 }
 
 validate_migration() {
     local resource_group=$1
+    local workspace_name=${2:-""}
     
     log_info "Validating migration..."
     
-    bash scripts/validate-deployment.sh "$resource_group" "$workspace_name"
+    if [ -z "$workspace_name" ]; then
+        log_error "Workspace name required for validation"
+        return 1
+    fi
     
-    if [ $? -eq 0 ]; then
+    if bash scripts/validate-deployment.sh "$resource_group" "$workspace_name"; then
         log_success "Migration validation passed"
         return 0
     else
@@ -280,11 +129,11 @@ show_usage() {
     echo "Commands:"
     echo "  check-version                           - Show current version"
     echo "  backup <rg>                             - Create migration backup"
-    echo "  migrate <rg> <workspace> <from> <to>    - Run migration"
-    echo "  rollback <backup-dir> <rg>              - Rollback migration"
     echo "  export <rg> [output-dir]                - Export configuration"
     echo "  import <source-dir> <rg>                - Import configuration"
     echo "  validate <rg> <workspace>               - Validate migration"
+    echo ""
+    echo "Note: v1 to v2 migration is not yet implemented."
     echo ""
 }
 
@@ -296,11 +145,9 @@ fi
 case "$1" in
     check-version) check_version ;;
     backup) create_migration_backup "$2" ;;
-    migrate) migrate_v1_to_v2 "$2" "$3" ;;
-    rollback) rollback_migration "$2" "$3" ;;
     export) export_configuration "$2" "$3" ;;
     import) import_configuration "$2" "$3" ;;
-    validate) validate_migration "$2" ;;
+    validate) validate_migration "$2" "$3" ;;
     *) show_usage; exit 1 ;;
 esac
 

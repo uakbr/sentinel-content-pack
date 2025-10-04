@@ -39,9 +39,18 @@ get_logic_app_run_history() {
     
     log_info "Fetching run history for $logic_app (last $hours hours)..."
     
+    local start_time
+    if date --version >/dev/null 2>&1; then
+        # GNU date (Linux)
+        start_time=$(date -u -d "${hours} hours ago" +%Y-%m-%dT%H:%M:%SZ)
+    else
+        # BSD date (macOS)
+        start_time=$(date -u -v-"${hours}"H +%Y-%m-%dT%H:%M:%SZ)
+    fi
+    
     az rest --method GET \
         --uri "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$resource_group/providers/Microsoft.Logic/workflows/$logic_app/runs?api-version=2019-05-01" \
-        --query "value[?properties.startTime >= '$(date -u -v-${hours}H +%Y-%m-%dT%H:%M:%SZ)'].{name:name, status:properties.status, startTime:properties.startTime, endTime:properties.endTime}" \
+        --query "value[?properties.startTime >= '$start_time'].{name:name, status:properties.status, startTime:properties.startTime, endTime:properties.endTime}" \
         -o table 2>/dev/null || log_warning "Could not retrieve run history"
 }
 
@@ -58,11 +67,14 @@ calculate_success_rate() {
         return
     fi
     
-    local total=$(echo "$runs" | wc -l | xargs)
-    local succeeded=$(echo "$runs" | grep -c "Succeeded" || echo "0")
+    local total
+    local succeeded
+    total=$(echo "$runs" | wc -l | xargs)
+    succeeded=$(echo "$runs" | grep -c "Succeeded" || echo "0")
     
     if [ "$total" -gt 0 ]; then
-        local rate=$(awk "BEGIN {printf \"%.1f\", ($succeeded/$total)*100}")
+        local rate
+        rate=$(awk "BEGIN {printf \"%.1f\", ($succeeded/$total)*100}")
         echo "${rate}% ($succeeded/$total)"
     else
         echo "N/A"
@@ -285,26 +297,33 @@ continuous_monitor() {
     local resource_group=$1
     local workspace_name=$2
     local interval=${3:-300}
+    local max_iterations=${4:-1000}
     
-    log_info "Starting continuous monitoring (interval: ${interval}s)"
+    log_info "Starting continuous monitoring (interval: ${interval}s, max iterations: $max_iterations)"
     log_info "Press Ctrl+C to stop"
     
-    while true; do
+    local iterations=0
+    while [ "$iterations" -lt "$max_iterations" ]; do
         clear
         echo "==================================="
         echo "Sentinel Health Monitor"
         echo "Time: $(date)"
+        echo "Iteration: $((iterations + 1))/$max_iterations"
         echo "==================================="
         echo ""
         
-        check_workspace_health "$resource_group" "$workspace_name"
+        check_workspace_health "$resource_group" "$workspace_name" || {
+            log_error "Health check failed, stopping monitoring"
+            break
+        }
         echo ""
         check_connection_health "$resource_group"
         echo ""
         check_analytics_rules "$resource_group" "$workspace_name"
         echo ""
         
-        local logic_apps=$(az resource list \
+        local logic_apps
+        logic_apps=$(az resource list \
             --resource-group "$resource_group" \
             --resource-type "Microsoft.Logic/workflows" \
             --query "[].name" -o tsv)
@@ -317,7 +336,10 @@ continuous_monitor() {
         done <<< "$logic_apps"
         
         sleep "$interval"
+        ((iterations++))
     done
+    
+    log_info "Monitoring stopped after $iterations iterations"
 }
 
 show_usage() {
@@ -374,7 +396,7 @@ case "$COMMAND" in
         setup_monitoring_alerts "$RESOURCE_GROUP" "$WORKSPACE" "$1"
         ;;
     monitor)
-        continuous_monitor "$RESOURCE_GROUP" "$WORKSPACE" "${1:-300}"
+        continuous_monitor "$RESOURCE_GROUP" "$WORKSPACE" "${1:-300}" "${2:-1000}"
         ;;
     *)
         show_usage

@@ -166,11 +166,14 @@ scan_for_secrets() {
     log_warning "Scanning for exposed secrets in files..."
     
     local patterns=(
-        "https://hooks\\.slack\\.com"
-        "https://.*\\.webhook\\.office\\.com"
-        "Bearer [A-Za-z0-9_-]{20,}"
+        "https://hooks\\.slack\\.com/services/[A-Z0-9/]+"
+        "https://.*\\.webhook\\.office\\.com/webhookb2/[a-f0-9-]+@[a-f0-9-]+/IncomingWebhook/[a-f0-9]+/[a-f0-9-]+"
+        "Bearer [A-Za-z0-9_\\.\\-]{40,}"
         "ghp_[A-Za-z0-9]{36}"
-        "AIza[0-9A-Za-z_-]{35}"
+        "ghs_[A-Za-z0-9]{36}"
+        "gho_[A-Za-z0-9]{36}"
+        "AIza[0-9A-Za-z_\\-]{35}"
+        "AKIA[0-9A-Z]{16}"
     )
     
     local found=false

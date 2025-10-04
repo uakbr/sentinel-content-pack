@@ -47,7 +47,29 @@ for LOGIC_APP in $LOGIC_APPS; do
             --set identity.type=SystemAssigned \
             --output none
         
-        sleep 5
+        # Wait for identity to be ready (poll instead of fixed sleep)
+        local timeout=30
+        local elapsed=0
+        while [ "$elapsed" -lt "$timeout" ]; do
+            local identity_status
+            identity_status=$(az resource show \
+                --resource-group "$RESOURCE_GROUP" \
+                --name "$LOGIC_APP" \
+                --resource-type "Microsoft.Logic/workflows" \
+                --query "identity.principalId" -o tsv 2>/dev/null || echo "")
+            
+            if [ -n "$identity_status" ] && [ "$identity_status" != "null" ]; then
+                echo "  Identity ready after ${elapsed}s"
+                break
+            fi
+            
+            sleep 2
+            elapsed=$((elapsed + 2))
+        done
+        
+        if [ "$elapsed" -ge "$timeout" ]; then
+            echo "  Warning: Identity may not be ready yet"
+        fi
     fi
     
     PRINCIPAL_ID=$(az resource show \
