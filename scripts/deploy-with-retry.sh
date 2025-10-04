@@ -35,7 +35,8 @@ save_state() {
     local status=$2
     local error_message=$3
     
-    local entry=$(jq -n \
+    local entry
+    entry=$(jq -n \
         --arg step "$step" \
         --arg status "$status" \
         --arg error "$error_message" \
@@ -46,7 +47,13 @@ save_state() {
         echo '{"deployment_history": []}' > "$STATE_FILE"
     fi
     
-    jq ".deployment_history += [$entry]" "$STATE_FILE" > "$STATE_FILE.tmp" && mv "$STATE_FILE.tmp" "$STATE_FILE"
+    # Atomic update with error handling
+    if jq ".deployment_history += [$entry]" "$STATE_FILE" > "$STATE_FILE.tmp"; then
+        mv -f "$STATE_FILE.tmp" "$STATE_FILE"
+    else
+        rm -f "$STATE_FILE.tmp"
+        return 1
+    fi
 }
 
 get_last_successful_step() {
@@ -64,9 +71,8 @@ retry_command() {
     local command=("$@")
     
     local attempt=1
-    local success=false
     
-    while [ $attempt -le $MAX_RETRIES ]; do
+    while [ "$attempt" -le "$MAX_RETRIES" ]; do
         log_info "[$step_name] Attempt $attempt/$MAX_RETRIES"
         
         if [ "$DRY_RUN" = true ]; then
@@ -78,15 +84,15 @@ retry_command() {
         if "${command[@]}" 2>&1 | tee /tmp/deploy-output.log; then
             log_success "[$step_name] Completed successfully"
             save_state "$step_name" "success" ""
-            success=true
-            break
+            return 0
         else
-            local error_msg=$(tail -n 5 /tmp/deploy-output.log | tr '\n' ' ')
+            local error_msg
+            error_msg=$(tail -n 5 /tmp/deploy-output.log | tr '\n' ' ')
             log_error "[$step_name] Failed on attempt $attempt"
             
-            if [ $attempt -lt $MAX_RETRIES ]; then
+            if [ "$attempt" -lt "$MAX_RETRIES" ]; then
                 log_warning "Retrying in $RETRY_DELAY seconds..."
-                sleep $RETRY_DELAY
+                sleep "$RETRY_DELAY"
                 ((attempt++))
             else
                 log_error "[$step_name] Max retries reached"
@@ -104,16 +110,6 @@ retry_command() {
     done
     
     return 0
-}
-
-deploy_with_throttling() {
-    local items=("$@")
-    local delay_between_items=5
-    
-    for item in "${items[@]}"; do
-        log_info "Processing: $item"
-        sleep $delay_between_items
-    done
 }
 
 check_azure_status() {

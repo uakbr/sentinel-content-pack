@@ -149,9 +149,8 @@ get_region_latency() {
     local region=$1
     
     local endpoint="https://${region}.management.azure.com"
-    local start=$(date +%s%3N)
     
-    curl -s -o /dev/null -w "%{time_total}" "$endpoint" 2>/dev/null || echo "N/A"
+    curl -s -o /dev/null -w "%{time_total}" --max-time 10 "$endpoint" 2>/dev/null || echo "timeout"
 }
 
 recommend_regions() {

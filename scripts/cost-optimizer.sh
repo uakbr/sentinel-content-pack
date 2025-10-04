@@ -20,13 +20,20 @@ calculate_logic_app_cost() {
     
     log_info "Calculating cost for: $logic_app (last $days days)"
     
-    local runs=$(az rest --method GET \
+    local runs
+    runs=$(az rest --method GET \
         --uri "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$resource_group/providers/Microsoft.Logic/workflows/$logic_app/runs?api-version=2019-05-01&\$top=1000" \
         --query "value | length(@)" 2>/dev/null || echo "0")
     
     local cost_per_execution=0.000025
-    local monthly_runs=$(echo "$runs * (30 / $days)" | bc 2>/dev/null || echo "0")
-    local monthly_cost=$(echo "$monthly_runs * $cost_per_execution" | bc 2>/dev/null || echo "0")
+    local monthly_runs
+    local monthly_cost
+    
+    # Prevent division by zero
+    if [ "$days" -eq 0 ]; then days=1; fi
+    
+    monthly_runs=$(echo "$runs * (30 / $days)" | bc 2>/dev/null || echo "0")
+    monthly_cost=$(echo "$monthly_runs * $cost_per_execution" | bc 2>/dev/null || echo "0")
     
     echo "  Runs: $runs (projected monthly: $monthly_runs)"
     echo "  Estimated monthly cost: \$$monthly_cost"
@@ -149,8 +156,6 @@ set_budget() {
     
     log_info "Setting up budget alert: \$${budget_amount}/month"
     
-    local subscription_id=$(az account show --query id -o tsv)
-    
     az consumption budget create \
         --resource-group "$resource_group" \
         --budget-name "Sentinel-Monthly-Budget" \
@@ -158,7 +163,7 @@ set_budget() {
         --category "Cost" \
         --time-grain "Monthly" \
         --start-date "$(date -u +%Y-%m-01)" \
-        --end-date "$(date -u -v+1y +%Y-%m-01)" \
+        --end-date "$(date -u -d '+1 year' +%Y-%m-01)" \
         --notifications "{\"Actual_GreaterThan_80_Percent\":{\"enabled\":true,\"operator\":\"GreaterThan\",\"threshold\":80,\"contactEmails\":[\"$email\"]}}" \
         2>/dev/null || log_warning "Could not create budget (requires permissions)"
     
@@ -171,8 +176,16 @@ get_cost_trends() {
     
     log_info "Fetching cost trends for last $days days..."
     
-    local end_date=$(date -u +%Y-%m-%d)
-    local start_date=$(date -u -v-${days}d +%Y-%m-%d)
+    local end_date
+    local start_date
+    end_date=$(date -u +%Y-%m-%d)
+    if date --version >/dev/null 2>&1; then
+        # GNU date (Linux)
+        start_date=$(date -u -d "${days} days ago" +%Y-%m-%d)
+    else
+        # BSD date (macOS)
+        start_date=$(date -u -v-"${days}"d +%Y-%m-%d)
+    fi
     
     az consumption usage list \
         --start-date "$start_date" \
